@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "ratelimit-fastapi"
+version = "1.0.0"
+description = "Ratelimit solution for FastAPI"
+authors = ["kuyugama <mail.kuyugama@gmail.com>"]
+readme = "README.md"
+
+packages = [
+    {include = "ratelimit"}
+]
+
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "0.115.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
