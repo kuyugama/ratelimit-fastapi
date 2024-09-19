@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import timedelta, datetime
 import random
 
 from fastapi import FastAPI, Depends, Request, status
@@ -6,9 +6,9 @@ from ratelimit.ranking.redis import RedisRanking
 from ratelimit.store.redis import RedisStore
 from fastapi.responses import JSONResponse
 from redis.asyncio import Redis
+from pydantic import BaseModel
 
 from ratelimit import (
-    RateLimitErrorResponse,
     RateLimitedError,
     setup_ratelimit,
     ratelimit,
@@ -40,6 +40,13 @@ setup_ratelimit(
 app = FastAPI()
 
 
+class ErrorResponseSchema(BaseModel):
+    message: str | None
+    reason: str
+    limited_for: int
+    limited_at: datetime
+
+
 @app.exception_handler(RateLimitedError)
 async def on_ratelimit_error(_, exc: RateLimitedError):
     return JSONResponse(
@@ -65,7 +72,7 @@ async def on_ratelimit_error(_, exc: RateLimitedError):
             )
         )
     ],
-    responses={429: {"model": RateLimitErrorResponse}},
+    responses={429: {"model": ErrorResponseSchema}},
 )
 def home(a: int = 10, b: int = 30):
     if a > b:
