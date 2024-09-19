@@ -44,6 +44,9 @@ def optional_user(
     user: int | None = Header(None),
     role: typing.Literal["default", "admin"] = Header("default"),
 ):
+    if user is None:
+        return None
+
     return {"id": user, "role": role}
 
 
