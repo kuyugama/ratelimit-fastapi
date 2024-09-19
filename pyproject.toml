@@ -9,9 +9,16 @@ packages = [
     {include = "ratelimit"}
 ]
 
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Framework :: FastAPI",
+]
+
+license = "GPL-3.0-only"
+
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = ">=3.9"
 fastapi = "0.115.0"
 
 
