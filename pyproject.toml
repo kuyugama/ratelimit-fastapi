@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ratelimit-fastapi"
-version = "1.0.1"
+version = "1.0.2"
 description = "Ratelimit solution for FastAPI"
 authors = ["kuyugama <mail.kuyugama@gmail.com>"]
 readme = "README.md"
