@@ -110,8 +110,4 @@ def get_rules_for_group(
 
 
 def is_setup() -> bool:
-    return (
-        hasattr(config, "AUTHENTICATION_FUNC")
-        and hasattr(config, "STORE")
-        and hasattr(config, "RANKING")
-    )
+    return hasattr(config, "STORE") and hasattr(config, "RANKING")

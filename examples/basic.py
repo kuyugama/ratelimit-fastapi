@@ -36,14 +36,15 @@ def auth_func(request: Request):
     return User(address=request.client.host, group="user")
 
 
+app = FastAPI()
+
 # Setup ratelimit
 setup_ratelimit(
+    app,
     ranking=RedisRanking(redis, User),  # Ranking stores user's ranks
     store=RedisStore(redis),  # Store stores endpoint related data
     authentication_func=auth_func,  # Register authentication function
 )
-
-app = FastAPI()
 
 
 @app.get(

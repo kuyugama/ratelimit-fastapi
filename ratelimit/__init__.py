@@ -2,7 +2,7 @@ from typing import Coroutine, Callable
 from datetime import timedelta
 from logging import getLogger
 
-from fastapi import Depends, Request
+from fastapi import Depends, Request, FastAPI
 
 from .context import RatelimitContext, require_ratelimit_context
 from .response import RateLimitErrorResponse
@@ -27,7 +27,13 @@ __all__ = [
 ]
 
 
+def __authentication_func_marker__():
+    """Placeholder dependency that replaced on ratelimit setup"""
+    pass
+
+
 def setup_ratelimit(
+    app: FastAPI,
     ranking: BaseRanking,
     store: BaseStore,
     authentication_func: Callable[
@@ -39,6 +45,7 @@ def setup_ratelimit(
     user_ttl: int | float = _config.USER_TTL,
     endpoint_ttl: int | float = _config.ENDPOINT_TTL,
 ):
+
     if util.is_setup():
         raise ValueError("RateLimit already setup")
 
@@ -53,28 +60,30 @@ def setup_ratelimit(
     if not callable(authentication_func):
         raise TypeError("Authority function must be callable")
 
+    app.dependency_overrides[__authentication_func_marker__] = (
+        authentication_func
+    )
+
     _config.USER_ENDPOINT_TTL = int(user_endpoint_ttl)
     _config.DEFAULT_BLOCK_TIME = int(default_block_time)
     _config.USER_TTL = int(user_ttl)
     _config.ENDPOINT_TTL = int(endpoint_ttl)
-    _config.AUTHENTICATION_FUNC = authentication_func
     _config.REASON_BUILDER = reason_builder
     _config.RANKING = ranking
     _config.STORE = store
 
 
 def ratelimit(*ranks: tuple[LimitRule, ...] | LimitRule):
-    if not util.is_setup():
-        raise ValueError("RateLimit is not setup")
-
-    authentication_func = _config.AUTHENTICATION_FUNC
-    ranking = _config.RANKING
-    store = _config.STORE
-
     async def dependency(
         request: Request,
-        context_authority: BaseUser = Depends(authentication_func),
+        context_authority: BaseUser = Depends(__authentication_func_marker__),
     ) -> None:
+        if not util.is_setup():
+            raise ValueError("RateLimit is not setup")
+
+        ranking = _config.RANKING
+        store = _config.STORE
+
         log = getLogger("ratelimit.dependency")
         now = util.utcnow()
 

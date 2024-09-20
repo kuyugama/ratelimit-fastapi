@@ -31,13 +31,14 @@ def auth_func(request: Request):
     return User(address=request.client.host, group="user")
 
 
+app = FastAPI()
+
 setup_ratelimit(
+    app,
     ranking=RedisRanking(redis, User),
     store=RedisStore(redis),
     authentication_func=auth_func,
 )
-
-app = FastAPI()
 
 
 class ErrorResponseSchema(BaseModel):
