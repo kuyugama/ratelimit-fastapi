@@ -68,15 +68,15 @@ async def authority_func(
 
 redis = Redis.from_url("redis://localhost:6379/1")
 
+app = FastAPI()
+
 setup_ratelimit(
+    app,
     ranking=RedisRanking(redis, RateLimitUser),
     store=RedisStore(redis),
     authentication_func=authority_func,
     user_ttl=timedelta(minutes=5).total_seconds(),
 )
-
-
-app = FastAPI()
 
 
 @app.get(

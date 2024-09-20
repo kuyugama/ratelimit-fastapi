@@ -1,5 +1,4 @@
-from typing import Callable, Coroutine, TYPE_CHECKING
-from .user import BaseUser
+from typing import TYPE_CHECKING
 from .store import BaseStore
 from .ranking import BaseRanking
 
@@ -20,6 +19,5 @@ def REASON_BUILDER(rule: "LimitRule") -> str:
     return "Max hits per time exceeded"
 
 
-AUTHENTICATION_FUNC: Callable[..., BaseUser | Coroutine[None, None, BaseUser]]
 RANKING: BaseRanking
 STORE: BaseStore
