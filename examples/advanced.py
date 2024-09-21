@@ -143,5 +143,5 @@ async def endpoint(
         "value": value,
         "data": context.data,
         "rule": context.rule,
-        "authority": context.authority,
+        "authority": context.user,
     }

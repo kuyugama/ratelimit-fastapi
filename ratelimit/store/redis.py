@@ -1,10 +1,9 @@
 from typing import Callable
 
 from redis.asyncio import Redis
-import pydantic
 
-from ratelimit.user import UserID
 from ratelimit.endpoint import Endpoint
+from ratelimit.user import UserID
 from ratelimit import BaseUser
 from ratelimit import config
 from .base import BaseStore
@@ -13,7 +12,7 @@ from .base import BaseStore
 def key_maker(endpoint: Endpoint, authority: UserID | None = None) -> str:
     key = f"endpoint:{endpoint.method}:{endpoint.path}"
     if authority:
-        key += f":authority:{authority}"
+        key += f":user:{authority}"
 
     return key
 

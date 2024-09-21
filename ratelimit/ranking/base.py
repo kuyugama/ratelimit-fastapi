@@ -8,8 +8,8 @@ T = TypeVar("T", bound=BaseUser)
 
 class BaseRanking(ABC, Generic[T]):
 
-    def __init__(self, authority_model: type[T]):
-        self.authority_model: type[T] = authority_model
+    def __init__(self, user_model: type[T]):
+        self.user_model: type[T] = user_model
 
     @abstractmethod
     async def save_user(self, authority: T): ...
