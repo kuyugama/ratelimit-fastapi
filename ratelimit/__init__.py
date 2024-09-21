@@ -2,7 +2,7 @@ from typing import Coroutine, Callable
 from datetime import timedelta
 from logging import getLogger
 
-from fastapi import Depends, Request, FastAPI
+from fastapi import Depends, Request, FastAPI, HTTPException
 
 from .context import RatelimitContext, require_ratelimit_context
 from .response import RateLimitErrorResponse
@@ -74,7 +74,9 @@ def setup_ratelimit(
 
 
 def ratelimit(
-    *ranks: tuple[LimitRule, ...] | LimitRule, no_block_delay: bool = True
+    *ranks: tuple[LimitRule, ...] | LimitRule,
+    no_block_delay: bool = True,
+    no_hit_on_exceptions: tuple[type[Exception], ...] = None,
 ):
     """
     Ratelimit dependency
@@ -246,7 +248,25 @@ def ratelimit(
 
         token = _RatelimitContextContainer.set(ctx)
 
-        yield
+        try:
+            yield
+        except Exception as e:
+            # Hit on HTTPException by default
+            if (
+                isinstance(e, HTTPException)
+                and no_hit_on_exceptions is not None
+                and HTTPException not in no_hit_on_exceptions
+            ):
+                raise
+
+            if (
+                no_hit_on_exceptions is not None
+                and isinstance(e, no_hit_on_exceptions)
+                and now in authority_endpoint.hits
+            ):
+                authority_endpoint.hits.remove(now)
+                await store.save_user_endpoint(authority_endpoint, authority)
+            raise
 
         _RatelimitContextContainer.reset(token)
 
