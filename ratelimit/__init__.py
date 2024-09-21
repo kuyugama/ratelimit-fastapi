@@ -44,6 +44,9 @@ def setup_ratelimit(
     default_block_time: int | float = _config.DEFAULT_BLOCK_TIME,
     user_ttl: int | float = _config.USER_TTL,
     endpoint_ttl: int | float = _config.ENDPOINT_TTL,
+    no_hit_on_exceptions: tuple[
+        type[Exception], ...
+    ] = _config.NO_HIT_ON_EXCEPTIONS,
 ):
 
     if util.is_setup():
@@ -64,6 +67,7 @@ def setup_ratelimit(
         authentication_func
     )
 
+    _config.NO_HIT_ON_EXCEPTIONS = no_hit_on_exceptions
     _config.USER_ENDPOINT_TTL = int(user_endpoint_ttl)
     _config.DEFAULT_BLOCK_TIME = int(default_block_time)
     _config.USER_TTL = int(user_ttl)
@@ -89,8 +93,13 @@ def ratelimit(
         request: Request,
         context_authority: BaseUser = Depends(__authentication_func_marker__),
     ) -> None:
+        nonlocal no_block_delay, no_hit_on_exceptions
+
         if not util.is_setup():
             raise ValueError("RateLimit is not setup")
+
+        if no_hit_on_exceptions is None:
+            no_hit_on_exceptions = _config.NO_HIT_ON_EXCEPTIONS
 
         ranking = _config.RANKING
         store = _config.STORE
@@ -254,14 +263,12 @@ def ratelimit(
             # Hit on HTTPException by default
             if (
                 isinstance(e, HTTPException)
-                and no_hit_on_exceptions is not None
                 and HTTPException not in no_hit_on_exceptions
             ):
                 raise
 
             if (
-                no_hit_on_exceptions is not None
-                and isinstance(e, no_hit_on_exceptions)
+                isinstance(e, no_hit_on_exceptions)
                 and now in authority_endpoint.hits
             ):
                 authority_endpoint.hits.remove(now)
