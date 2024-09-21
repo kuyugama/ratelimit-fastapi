@@ -186,6 +186,10 @@ def ratelimit(
                         },
                     )
 
+                else:
+                    # Remove this hit to prevent loops
+                    authority_endpoint.hits = authority_endpoint.hits[:-1]
+
             # Save endpoints in case of existing rule or not
             await store.save_user_endpoint(authority_endpoint, authority)
 
