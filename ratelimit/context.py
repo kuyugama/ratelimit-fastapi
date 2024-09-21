@@ -2,6 +2,7 @@ from typing import Literal, TYPE_CHECKING, Optional
 from dataclasses import dataclass, replace
 from contextvars import ContextVar
 
+from .endpoint import Endpoint
 from .user import BaseUser
 
 
@@ -38,10 +39,16 @@ class _ContextData:
 
 
 class RatelimitContext:
-    def __init__(self, rule: Optional["LimitRule"], authority: BaseUser):
+    def __init__(
+        self,
+        rule: Optional["LimitRule"],
+        authority: BaseUser,
+        endpoint: Endpoint,
+    ):
         self._data = _ContextData()
         self.rule = replace(rule) if rule else None
         self.authority = authority.model_copy()
+        self.endpoint = endpoint.model_copy()
 
     @property
     def data(self):
