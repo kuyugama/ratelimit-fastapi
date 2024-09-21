@@ -2,7 +2,7 @@ from typing import Coroutine, Callable
 from datetime import timedelta
 from logging import getLogger
 
-from fastapi import Depends, Request, FastAPI
+from fastapi import Depends, Request, FastAPI, HTTPException
 
 from .context import RatelimitContext, require_ratelimit_context
 from .response import RateLimitErrorResponse
@@ -44,6 +44,9 @@ def setup_ratelimit(
     default_block_time: int | float = _config.DEFAULT_BLOCK_TIME,
     user_ttl: int | float = _config.USER_TTL,
     endpoint_ttl: int | float = _config.ENDPOINT_TTL,
+    no_hit_on_exceptions: tuple[
+        type[Exception], ...
+    ] = _config.NO_HIT_ON_EXCEPTIONS,
 ):
 
     if util.is_setup():
@@ -64,6 +67,7 @@ def setup_ratelimit(
         authentication_func
     )
 
+    _config.NO_HIT_ON_EXCEPTIONS = no_hit_on_exceptions
     _config.USER_ENDPOINT_TTL = int(user_endpoint_ttl)
     _config.DEFAULT_BLOCK_TIME = int(default_block_time)
     _config.USER_TTL = int(user_ttl)
@@ -74,7 +78,9 @@ def setup_ratelimit(
 
 
 def ratelimit(
-    *ranks: tuple[LimitRule, ...] | LimitRule, no_block_delay: bool = True
+    *ranks: tuple[LimitRule, ...] | LimitRule,
+    no_block_delay: bool = True,
+    no_hit_on_exceptions: tuple[type[Exception], ...] = None,
 ):
     """
     Ratelimit dependency
@@ -87,8 +93,13 @@ def ratelimit(
         request: Request,
         context_authority: BaseUser = Depends(__authentication_func_marker__),
     ) -> None:
+        nonlocal no_block_delay, no_hit_on_exceptions
+
         if not util.is_setup():
             raise ValueError("RateLimit is not setup")
+
+        if no_hit_on_exceptions is None:
+            no_hit_on_exceptions = _config.NO_HIT_ON_EXCEPTIONS
 
         ranking = _config.RANKING
         store = _config.STORE
@@ -246,7 +257,23 @@ def ratelimit(
 
         token = _RatelimitContextContainer.set(ctx)
 
-        yield
+        try:
+            yield
+        except Exception as e:
+            # Hit on HTTPException by default
+            if (
+                isinstance(e, HTTPException)
+                and HTTPException not in no_hit_on_exceptions
+            ):
+                raise
+
+            if (
+                isinstance(e, no_hit_on_exceptions)
+                and now in authority_endpoint.hits
+            ):
+                authority_endpoint.hits.remove(now)
+                await store.save_user_endpoint(authority_endpoint, authority)
+            raise
 
         _RatelimitContextContainer.reset(token)
 
