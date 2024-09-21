@@ -253,7 +253,7 @@ def ratelimit(
                     endpoint.ignore_times -= 1
                     await store.save_endpoint(endpoint)
 
-        ctx = RatelimitContext(rule, authority)
+        ctx = RatelimitContext(rule, authority, authority_endpoint)
 
         token = _RatelimitContextContainer.set(ctx)
 
