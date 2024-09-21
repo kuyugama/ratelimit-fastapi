@@ -22,7 +22,7 @@ logging.basicConfig(level=logging.DEBUG)
 
 
 class RateLimitUser(BaseUser):
-    user_id: int | None
+    user_id: int | None = None
     address: str
 
     @property
