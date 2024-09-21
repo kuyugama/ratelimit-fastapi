@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 class _IgnoreData:
     times: int | None = None
     seconds: int | None = None
-    level: Literal["authority", "endpoint"] = "authority"
+    level: Literal["user", "endpoint"] = "user"
     count_this: bool = False
 
 
@@ -42,12 +42,12 @@ class RatelimitContext:
     def __init__(
         self,
         rule: Optional["LimitRule"],
-        authority: BaseUser,
+        user: BaseUser,
         endpoint: Endpoint,
     ):
         self._data = _ContextData()
         self.rule = replace(rule) if rule else None
-        self.authority = authority.model_copy()
+        self.user = user.model_copy()
         self.endpoint = endpoint.model_copy()
 
     @property
@@ -65,9 +65,7 @@ class RatelimitContext:
     ):
         self._data = replace(
             self._data,
-            ignore_data=_IgnoreData(
-                for_times, for_seconds, "authority", count_this
-            ),
+            ignore_data=_IgnoreData(for_times, for_seconds, "user", count_this),
         )
 
     def ignore_all_users(

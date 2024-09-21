@@ -8,7 +8,7 @@ from ratelimit import BaseUser, config
 
 
 def key_maker(user_id: UserID) -> str:
-    return f"authority:{user_id}"
+    return f"user:{user_id}"
 
 
 T = TypeVar("T", bound=BaseUser)
@@ -18,10 +18,10 @@ class RedisRanking(BaseRanking, Generic[T]):
     def __init__(
         self,
         redis: Redis,
-        authority_model: type[T],
+        user_model: type[T],
         key_maker: Callable[[UserID], str] = key_maker,
     ):
-        super().__init__(authority_model)
+        super().__init__(user_model)
         self._redis = redis
         self.key_maker = key_maker
 
@@ -38,4 +38,4 @@ class RedisRanking(BaseRanking, Generic[T]):
         if not data:
             return None
 
-        return self.authority_model.model_validate_json(data)
+        return self.user_model.model_validate_json(data)

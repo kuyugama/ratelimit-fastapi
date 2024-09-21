@@ -7,7 +7,7 @@ from . import config
 
 
 class Ignore(BaseException):
-    def __init__(self, context: Literal["endpoint", "authority"]):
+    def __init__(self, context: Literal["endpoint", "user"]):
         self.context = context
 
 
@@ -26,7 +26,7 @@ def utcnow() -> datetime.datetime:
 def get_exceeded_rule(
     rules: LimitRule | tuple[LimitRule, ...],
     endpoint: Endpoint,
-    authority_endpoint: Endpoint,
+    user_endpoint: Endpoint,
     group: str,
 ) -> LimitRule | None:
     now = utcnow()
@@ -37,22 +37,22 @@ def get_exceeded_rule(
         raise IgnoreByCount("endpoint")
 
     elif (
-        authority_endpoint.ignore_times is not None
-        and authority_endpoint.ignore_times > 0
+        user_endpoint.ignore_times is not None
+        and user_endpoint.ignore_times > 0
     ):
-        raise IgnoreByCount("authority")
+        raise IgnoreByCount("user")
 
     if endpoint.ignore_until is not None and endpoint.ignore_until >= now:
         raise IgnoreByTime("endpoint")
 
     elif (
-        authority_endpoint.ignore_until is not None
-        and authority_endpoint.ignore_until >= now
+        user_endpoint.ignore_until is not None
+        and user_endpoint.ignore_until >= now
     ):
-        raise IgnoreByTime("authority")
+        raise IgnoreByTime("user")
 
     for rule in rules:
-        hits = authority_endpoint.hits
+        hits = user_endpoint.hits
 
         if rule.hits is not None:
             min_hit_time = now - datetime.timedelta(seconds=rule.batch_time)
