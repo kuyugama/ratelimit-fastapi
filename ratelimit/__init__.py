@@ -73,7 +73,16 @@ def setup_ratelimit(
     _config.STORE = store
 
 
-def ratelimit(*ranks: tuple[LimitRule, ...] | LimitRule):
+def ratelimit(
+    *ranks: tuple[LimitRule, ...] | LimitRule, no_block_delay: bool = True
+):
+    """
+    Ratelimit dependency
+    :param ranks: Limit ranks
+    :param no_block_delay: No block at rules with "delay" set
+    :return: Actual dependency
+    """
+
     async def dependency(
         request: Request,
         context_authority: BaseUser = Depends(__authentication_func_marker__),
@@ -118,6 +127,7 @@ def ratelimit(*ranks: tuple[LimitRule, ...] | LimitRule):
             )
             raise RateLimitedError(
                 authority_endpoint.blocked_by_rule,
+                authority_endpoint,
                 authority_endpoint.blocked_at,
                 authority_endpoint.blocked_by_rule.reason
                 or _config.REASON_BUILDER(authority_endpoint.blocked_by_rule),
@@ -160,20 +170,25 @@ def ratelimit(*ranks: tuple[LimitRule, ...] | LimitRule):
                         },
                     )
 
-                # Set the rule user is limited by
-                authority_endpoint.blocked_by_rule = rule
-                authority_endpoint.blocked_at = now
-                log.debug(
-                    f"Rate-limit UID {authority.unique_id} "
-                    f"for {method} requests at {path}",
-                    extra={
-                        "rule": rule,
-                        "path": path,
-                        "method": method,
-                        "authority": authority,
-                        "endpoint": authority_endpoint,
-                    },
-                )
+                if not (rule.delay is not None and no_block_delay):
+                    # Set the rule user is limited by
+                    authority_endpoint.blocked_by_rule = rule
+                    authority_endpoint.blocked_at = now
+                    log.debug(
+                        f"Rate-limit UID {authority.unique_id} "
+                        f"for {method} requests at {path}",
+                        extra={
+                            "rule": rule,
+                            "path": path,
+                            "method": method,
+                            "authority": authority,
+                            "endpoint": authority_endpoint,
+                        },
+                    )
+
+                else:
+                    # Remove this hit to prevent loops
+                    authority_endpoint.hits = authority_endpoint.hits[:-1]
 
             # Save endpoints in case of existing rule or not
             await store.save_user_endpoint(authority_endpoint, authority)
@@ -194,9 +209,11 @@ def ratelimit(*ranks: tuple[LimitRule, ...] | LimitRule):
                 )
                 raise RateLimitedError(
                     rule,
+                    authority_endpoint,
                     now,
                     _config.REASON_BUILDER(rule),
                     rule.message,
+                    options={"no_block_delay": no_block_delay},
                 )
 
         except util.Ignore as e:
