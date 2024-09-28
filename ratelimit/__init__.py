@@ -81,11 +81,13 @@ def ratelimit(
     *ranks: tuple[LimitRule, ...] | LimitRule,
     no_block_delay: bool = True,
     no_hit_on_exceptions: tuple[type[Exception], ...] = None,
+    use_raw_path: bool = False,
 ):
     """
     Ratelimit dependency
     :param ranks: Limit ranks
     :param no_block_delay: No block at rules with "delay" set
+    :param use_raw_path: Use endpoint raw path
     :return: Actual dependency
     """
 
@@ -112,6 +114,11 @@ def ratelimit(
             user = context_user
 
         path = request.url.path
+        if use_raw_path:
+            path = (
+                request.scope.get("root_path")
+                + request.scope.get("route").path_format
+            )
         method = request.method
 
         log.debug(
