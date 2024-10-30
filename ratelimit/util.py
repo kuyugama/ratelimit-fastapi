@@ -1,9 +1,13 @@
 from typing import Literal
 import datetime
 
+from fastapi.routing import APIRoute
+from fastapi import APIRouter, FastAPI
+from fastapi.dependencies.models import Dependant
+from fastapi.dependencies.utils import get_dependant
+
 from .endpoint import Endpoint
 from .rule import LimitRule
-from . import config
 
 
 class Ignore(BaseException):
@@ -109,5 +113,35 @@ def get_rules_for_group(
     )
 
 
-def is_setup() -> bool:
-    return hasattr(config, "STORE") and hasattr(config, "RANKING")
+def is_setup(app: FastAPI) -> bool:
+    return hasattr(app, "STORE") and hasattr(app, "RANKING")
+
+
+def find_marker(dependant: Dependant, marker):
+    for dependency in dependant.dependencies:
+        if dependency.call is marker:
+            return dependant, dependency
+
+        if (dep := find_marker(dependency, marker)) is not None:
+            return dep
+
+    return None, None
+
+
+def replace_dependency(app: FastAPI, marker, destination) -> None:
+    router: APIRouter = getattr(app, "router")
+
+    for route in router.routes:
+        if not isinstance(route, APIRoute):
+            continue
+
+        dependant, dependency = find_marker(route.dependant, marker)
+
+        if dependant is None:
+            continue
+
+        destination_dependant = get_dependant(path=route.path, call=destination)
+
+        dependant.dependencies[dependant.dependencies.index(dependency)] = (
+            destination_dependant
+        )

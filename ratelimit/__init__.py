@@ -21,6 +21,8 @@ __all__ = [
     "RateLimitErrorResponse",
     "RateLimitedError",
     "RatelimitContext",
+    "setup_ratelimit",
+    "setup_app",
     "BaseUser",
     "LimitRule",
     "ratelimit",
@@ -32,25 +34,16 @@ def __authentication_func_marker__():
     pass
 
 
-def setup_ratelimit(
+def setup_app(
     app: FastAPI,
     ranking: BaseRanking,
     store: BaseStore,
     authentication_func: Callable[
         ..., BaseUser | Coroutine[None, None, BaseUser]
-    ],
-    reason_builder: Callable[[LimitRule], str] = _config.REASON_BUILDER,
-    user_endpoint_ttl: int | float = _config.USER_ENDPOINT_TTL,
-    default_block_time: int | float = _config.DEFAULT_BLOCK_TIME,
-    user_ttl: int | float = _config.USER_TTL,
-    endpoint_ttl: int | float = _config.ENDPOINT_TTL,
-    no_hit_on_exceptions: tuple[
-        type[Exception], ...
-    ] = _config.NO_HIT_ON_EXCEPTIONS,
+    ] = __authentication_func_marker__,
 ):
-
-    if util.is_setup():
-        raise ValueError("RateLimit already setup")
+    if util.is_setup(app):
+        raise RuntimeError(f"App {app} already setup")
 
     if not issubclass(type(ranking), BaseRanking):
         raise TypeError(
@@ -63,18 +56,36 @@ def setup_ratelimit(
     if not callable(authentication_func):
         raise TypeError("Authority function must be callable")
 
+    app.RANKING = ranking
+    app.STORE = store
+
+    # Fix openapi schema
+    util.replace_dependency(
+        app, __authentication_func_marker__, authentication_func
+    )
+
+    # noinspection PyUnresolvedReferences
     app.dependency_overrides[__authentication_func_marker__] = (
         authentication_func
     )
 
+
+def setup_ratelimit(
+    reason_builder: Callable[[LimitRule], str] = _config.REASON_BUILDER,
+    user_endpoint_ttl: int | float = _config.USER_ENDPOINT_TTL,
+    default_block_time: int | float = _config.DEFAULT_BLOCK_TIME,
+    user_ttl: int | float = _config.USER_TTL,
+    endpoint_ttl: int | float = _config.ENDPOINT_TTL,
+    no_hit_on_exceptions: tuple[
+        type[Exception], ...
+    ] = _config.NO_HIT_ON_EXCEPTIONS,
+):
     _config.NO_HIT_ON_EXCEPTIONS = no_hit_on_exceptions
     _config.USER_ENDPOINT_TTL = int(user_endpoint_ttl)
     _config.DEFAULT_BLOCK_TIME = int(default_block_time)
     _config.USER_TTL = int(user_ttl)
     _config.ENDPOINT_TTL = int(endpoint_ttl)
     _config.REASON_BUILDER = reason_builder
-    _config.RANKING = ranking
-    _config.STORE = store
 
 
 def ratelimit(
@@ -97,14 +108,16 @@ def ratelimit(
     ) -> None:
         nonlocal no_block_delay, no_hit_on_exceptions
 
-        if not util.is_setup():
-            raise ValueError("RateLimit is not setup")
+        app = request.app
+
+        if not util.is_setup(app):
+            raise ValueError(f"RateLimit is not initialized for app {app}")
 
         if no_hit_on_exceptions is None:
             no_hit_on_exceptions = _config.NO_HIT_ON_EXCEPTIONS
 
-        ranking = _config.RANKING
-        store = _config.STORE
+        ranking = app.RANKING
+        store = app.STORE
 
         log = getLogger("ratelimit.dependency")
         now = util.utcnow()

@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from typing import Any, Mapping
 from datetime import timedelta
 import logging
@@ -13,9 +14,10 @@ from ratelimit import (
     require_ratelimit_context,
     RatelimitContext,
     setup_ratelimit,
-    BaseUser,
     LimitRule,
     ratelimit,
+    setup_app,
+    BaseUser,
 )
 
 logging.basicConfig(level=logging.DEBUG)
@@ -66,17 +68,22 @@ async def authority_func(
     )
 
 
-redis = Redis.from_url("redis://localhost:6379/1")
+@asynccontextmanager
+async def lifespan(fastapi: FastAPI):
+    redis = Redis.from_url("redis://localhost:6379/1")
+    setup_ratelimit(
+        user_ttl=timedelta(minutes=5).total_seconds(),
+    )
+    setup_app(
+        fastapi,
+        ranking=RedisRanking(redis, RateLimitUser),
+        store=RedisStore(redis),
+        authentication_func=authority_func,
+    )
+    yield
 
-app = FastAPI()
 
-setup_ratelimit(
-    app,
-    ranking=RedisRanking(redis, RateLimitUser),
-    store=RedisStore(redis),
-    authentication_func=authority_func,
-    user_ttl=timedelta(minutes=5).total_seconds(),
-)
+app = FastAPI(lifespan=lifespan)
 
 
 @app.get(

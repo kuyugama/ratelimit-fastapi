@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from datetime import timedelta, datetime
 import random
 
@@ -10,9 +11,9 @@ from pydantic import BaseModel
 
 from ratelimit import (
     RateLimitedError,
-    setup_ratelimit,
     ratelimit,
     LimitRule,
+    setup_app,
     BaseUser,
 )
 
@@ -31,14 +32,19 @@ def auth_func(request: Request):
     return User(address=request.client.host, group="user")
 
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(fastapi: FastAPI):
+    setup_app(
+        fastapi,
+        ranking=RedisRanking(redis, User),
+        store=RedisStore(redis),
+        authentication_func=auth_func,
+    )
 
-setup_ratelimit(
-    app,
-    ranking=RedisRanking(redis, User),
-    store=RedisStore(redis),
-    authentication_func=auth_func,
-)
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 
 class ErrorResponseSchema(BaseModel):
