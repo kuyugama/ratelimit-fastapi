@@ -5,6 +5,7 @@ Library allows to easily create fastapi endpoints protected by ratelimit
 
 Here is a basic example:
 ```python
+from contextlib import asynccontextmanager
 from datetime import timedelta
 import random
 
@@ -15,9 +16,9 @@ from redis.asyncio import Redis
 
 from ratelimit import (
     RateLimitErrorResponse,
-    setup_ratelimit,
     ratelimit,
     LimitRule,
+    setup_app,
     BaseUser,
 )
 
@@ -43,15 +44,18 @@ def auth_func(request: Request):
     return User(address=request.client.host, group="user")
 
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(fastapi: FastAPI):
+    # Setup ratelimit
+    setup_app(
+        fastapi,
+        ranking=RedisRanking(redis, User),  # Ranking stores user's ranks
+        store=RedisStore(redis),  # Store stores endpoint related data
+        authentication_func=auth_func,  # Register authentication function
+    )
+    yield
 
-# Setup ratelimit
-setup_ratelimit(
-    app,
-    ranking=RedisRanking(redis, User),  # Ranking stores user's ranks
-    store=RedisStore(redis),  # Store stores endpoint related data
-    authentication_func=auth_func,  # Register authentication function
-)
+app = FastAPI(lifespan=lifespan)
 
 
 @app.get(
