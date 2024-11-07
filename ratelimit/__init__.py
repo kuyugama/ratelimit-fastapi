@@ -116,8 +116,8 @@ def ratelimit(
         if no_hit_on_exceptions is None:
             no_hit_on_exceptions = _config.NO_HIT_ON_EXCEPTIONS
 
-        ranking = app.RANKING
-        store = app.STORE
+        ranking: BaseRanking = app.RANKING
+        store: BaseStore = app.STORE
 
         log = getLogger("ratelimit.dependency")
         now = util.utcnow()
@@ -274,7 +274,7 @@ def ratelimit(
         try:
             yield
         except Exception as e:
-            # Hit on HTTPException by default
+            # Hit on HTTPException (not subclasses) by default
             if (
                 isinstance(e, HTTPException)
                 and HTTPException not in no_hit_on_exceptions
@@ -318,11 +318,12 @@ def ratelimit(
                     else None
                 )
 
-                await store.save_endpoint(endpoint)
-
                 if data.count_this and now in user_endpoint.hits:
+                    endpoint.ignore_times -= 1
                     user_endpoint.hits.remove(now)
                     await store.save_user_endpoint(user_endpoint, user)
+
+                await store.save_endpoint(endpoint)
 
                 log.debug(
                     f"Ignore new {method} requests for {path} "
@@ -346,6 +347,7 @@ def ratelimit(
                 )
 
                 if data.count_this and now in user_endpoint.hits:
+                    user_endpoint.ignore_times -= 1
                     user_endpoint.hits.remove(now)
 
                 await store.save_user_endpoint(user_endpoint, user)
